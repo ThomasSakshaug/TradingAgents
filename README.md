@@ -221,6 +221,56 @@ At start-up the interactive CLI mentions a newer release and notices from Tauric
 
 A saved report also includes `complete_report.html`, the report as one page with its sections listed beside the text, for reading in a browser, on a phone or in print. Answering the save question at the prompt also asks about the page and can open it in your browser; `--no-html` skips it, and so does `ta.save_reports(state, "NVDA", html=False)` from Python.
 
+### Local web interface
+
+From the repository root, install the optional web dependencies and start Streamlit:
+
+```powershell
+uv pip install --python .\.venv\Scripts\python.exe ".[web]"
+.\.venv\Scripts\python.exe -m streamlit run .\web_app.py --server.address 127.0.0.1
+```
+
+Open `http://127.0.0.1:8501`. Choose a ticker, analysis date, analysts, models,
+report language and debate depth, then acknowledge API charges and click **Start
+analysis**. Nothing calls the LLM until you submit the form. Progress shows elapsed
+time and the CLI's execution log, not a percentage or an estimate of remaining time.
+Keep the tab open during a run; closing it does not reliably cancel provider calls.
+
+The provider, keys and other defaults come from `.env`, just as for the CLI.
+Restart the server after changing that file. Credentials stay on the Python
+server, not in browser inputs. Each analysis uses a separate CLI process and
+results directory under `results_dir/web/<run-id>` (including `console.log`);
+the **Reports** tab also includes existing terminal reports under
+`results_dir/reports`. Reports remain on disk across server restarts and can be
+read in the page or downloaded as Markdown/HTML. Failed runs are explicitly
+reported; inspect their execution logs for provider or market-data failures.
+
+The sidebar offers the configured provider and **Ollama (local / self-hosted)**.
+API model dropdowns use the shared CLI catalog, preserve configured model IDs,
+and include **Custom model ID** for models not listed. Catalog entries do not
+guarantee access on your account.
+
+For Ollama, start your Ollama server and pull a tool-capable model (for example
+`ollama pull qwen3:8b`). Set **Ollama API URL** to its OpenAI-compatible endpoint
+(default `http://localhost:11434/v1`, or `OLLAMA_BASE_URL` from `.env`).
+Both dropdowns show installed models discovered via `/models`; click
+**Refresh Ollama models** after installing one. Discovery is cached for 30 seconds.
+An unreachable server or empty list is shown explicitly and disables starting a
+run; existing reports remain accessible. Selecting Ollama routes both tiers and
+their endpoints to that server, overriding any API tier overrides for that run
+without changing `.env`. Local inference needs no Gemini key or Gemini quota;
+market-data requests still require network access.
+
+The interface overrides the models, language and both round counts with the form
+values. Other environment settings, including per-tier providers and data
+vendors, remain in effect for the configured API provider. Web runs start fresh with checkpointing disabled.
+The terminal interface is unchanged and does not require Streamlit.
+
+This is a **local, single-user interface without authentication**. Keep it bound
+to `127.0.0.1`; do not expose it to a LAN or the internet. LLM and market-data
+requests still leave your PC. AI-generated reports are experimental research,
+not financial advice.
+
 ### Markets and tickers
 
 TradingAgents works with any market Yahoo Finance covers, using the exchange-suffixed ticker. Company identity and the alpha benchmark resolve automatically per market.

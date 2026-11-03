@@ -266,6 +266,20 @@ values. Other environment settings, including per-tier providers and data
 vendors, remain in effect for the configured API provider. Web runs start fresh with checkpointing disabled.
 The terminal interface is unchanged and does not require Streamlit.
 
+The **Proposal** tab lists `Ticker`, `Name`, `Date` and `Proposal` (`Buy`, `Hold`
+or `Sell`). It rebuilds from saved terminal and web reports after every page run,
+including immediately after a new report is generated, and survives server
+restarts without a separate database. There is one row per ticker: the latest
+**analysis date** wins, then the report's **generation time** for ties.
+Overweight maps to Buy and Underweight to Sell, using only the final rating in
+the report header, not intermediate trader/analyst opinions. An unreadable latest
+rating is warned about and omitted rather than replaced with an older proposal
+or an invented Hold. Malformed/unreadable report metadata is also warned about.
+New reports record the resolved instrument name; for older reports without a
+name the page attempts a cached market-data lookup. Unavailable names are
+explicitly marked. **Refresh proposals** reloads reports created outside the
+current session; no LLM calls are needed to build this list.
+
 This is a **local, single-user interface without authentication**. Keep it bound
 to `127.0.0.1`; do not expose it to a LAN or the internet. LLM and market-data
 requests still leave your PC. AI-generated reports are experimental research,

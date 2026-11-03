@@ -14,6 +14,7 @@ from uuid import uuid4
 import requests
 
 from cli.prompts import detect_asset_type, parse_analysis_date, parse_analysts, parse_ticker
+from tradingagents.agents.rating import extract_rating
 from tradingagents.llm_clients.model_catalog import get_model_options
 
 
@@ -200,3 +201,52 @@ def list_reports(results_dir: Path) -> list[Path]:
         *results_dir.glob("web/*/reports/*/complete_report.md"),
     ]
     return sorted(reports, key=lambda path: path.stat().st_mtime_ns, reverse=True)
+
+
+def latest_proposals(results_dir: Path) -> tuple[list[dict[str, str]], list[str]]:
+    """Read only report metadata, never analyst prose or a trader's intermediate action."""
+    latest: dict[str, tuple[tuple[str, str, int, str], dict[str, str], str]] = {}
+    warnings = []
+    for path in list_reports(results_dir):
+        try:
+            header = path.read_text(encoding="utf-8").split("\n## ", 1)[0]
+            lines = header.splitlines()
+            if not lines or not lines[0].startswith("# Trading Analysis Report: "):
+                raise ValueError("missing report ticker")
+            ticker = parse_ticker(lines[0].removeprefix("# Trading Analysis Report: "))
+            fields = {}
+            for line in lines[1:]:
+                if line.startswith("- ") and ": " in line:
+                    key, value = line[2:].split(": ", 1)
+                    fields[key] = value
+            analysis_date = parse_analysis_date(fields.get("Analysis date", ""))
+            generated = datetime.strptime(fields.get("Generated", ""), "%Y-%m-%d %H:%M:%S")
+            rating = extract_rating(f"Rating: {fields.get('Rating', '')}")
+            proposal = {
+                "Buy": "Buy",
+                "Overweight": "Buy",
+                "Hold": "Hold",
+                "Underweight": "Sell",
+                "Sell": "Sell",
+            }.get(rating or "", "")
+            row = {
+                "Ticker": ticker,
+                "Name": fields.get("Name", ""),
+                "Date": analysis_date,
+                "Proposal": proposal,
+            }
+            order = (analysis_date, generated.isoformat(), path.stat().st_mtime_ns, str(path))
+            if ticker not in latest or order > latest[ticker][0]:
+                latest[ticker] = (order, row, str(path.parent))
+        except (OSError, ValueError) as exc:
+            warnings.append(f"Could not read proposal from {path.parent}: {exc}")
+    rows = []
+    for ticker, (_, row, source) in sorted(latest.items()):
+        if row["Proposal"]:
+            rows.append(row)
+        else:
+            warnings.append(
+                f"{ticker}: latest report has no readable final rating ({source}). "
+                "No older proposal is substituted."
+            )
+    return rows, warnings

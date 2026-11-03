@@ -12,6 +12,55 @@ from cli import web
 _SOCKET_CONNECT = socket.socket.connect
 
 
+def test_proposal_tab_updates_after_report_generation_and_on_next_session(
+    tmp_path,
+    monkeypatch,
+    streamlit_testing,
+):
+    from tradingagents.default_config import DEFAULT_CONFIG
+    from tradingagents.reporting import write_report_tree
+
+    monkeypatch.setitem(DEFAULT_CONFIG, "results_dir", str(tmp_path))
+
+    def save(folder, day, rating):
+        state = {
+            "trade_date": day,
+            "final_trade_decision": f"**Rating**: {rating}",
+            "instrument_context": (
+                " Resolved identity: Company: NVIDIA Corporation. Do not substitute"
+            ),
+        }
+        return write_report_tree(state, "NVDA", tmp_path / folder)
+
+    def fake_run(request, *args):
+        path = save("web/run/reports/new", "2026-01-02", "Underweight")
+        yield web.RunUpdate(1.0, "Mock completed", path)
+
+    monkeypatch.setattr(web, "run_web_analysis", fake_run)
+    source = str(Path(__file__).parents[1] / "web_app.py")
+    app = streamlit_testing.AppTest.from_file(source).run()
+    assert [tab.label for tab in app.tabs] == ["New analysis", "Reports", "Proposal"]
+    assert not app.dataframe
+    app.checkbox[0].check()
+    next(button for button in app.button if button.label == "Start analysis").click().run()
+    assert not app.exception
+    table = app.dataframe[0].value
+    assert list(table.columns) == ["Ticker", "Name", "Date", "Proposal"]
+    assert table.to_dict("records") == [
+        {
+            "Ticker": "NVDA",
+            "Name": "NVIDIA Corporation",
+            "Date": "2026-01-02",
+            "Proposal": "Sell",
+        }
+    ]
+    fresh = streamlit_testing.AppTest.from_file(source).run()
+    assert fresh.dataframe[0].value.to_dict("records") == table.to_dict("records")
+    save("reports/newer", "2026-01-04", "Buy")
+    next(button for button in fresh.button if button.label == "Refresh proposals").click().run()
+    assert fresh.dataframe[0].value.iloc[0]["Proposal"] == "Buy"
+
+
 @pytest.fixture
 def streamlit_testing(monkeypatch, _no_network):
     testing = pytest.importorskip("streamlit.testing.v1")

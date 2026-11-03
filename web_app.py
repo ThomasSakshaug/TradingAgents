@@ -12,11 +12,13 @@ from cli.web import (
     WebRequest,
     WebRunError,
     build_command,
+    latest_proposals,
     list_reports,
     model_options,
     ollama_models,
     run_web_analysis,
 )
+from tradingagents.agents.context import resolve_instrument_identity
 from tradingagents.default_config import DEFAULT_CONFIG
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,11 @@ configured_provider = DEFAULT_CONFIG["llm_provider"]
 @st.cache_data(ttl=30, show_spinner=False)
 def installed_ollama_models(url: str) -> list[str]:
     return ollama_models(url)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def proposal_name(ticker: str) -> str:
+    return resolve_instrument_identity(ticker).get("company_name", "")
 
 
 def select_model(label: str, provider: str, mode: str, default: str) -> str:
@@ -108,7 +115,7 @@ with st.sidebar:
     language = st.selectbox("Report language", ["English", "Norwegian"])
     st.caption("Restart the server after changing credentials or provider settings in .env.")
 
-analysis_tab, history_tab = st.tabs(["New analysis", "Reports"])
+analysis_tab, history_tab, proposal_tab = st.tabs(["New analysis", "Reports", "Proposal"])
 
 with analysis_tab:
     st.subheader("Start an analysis")
@@ -221,3 +228,36 @@ with history_tab:
     except OSError as exc:
         logger.exception("Could not read saved reports")
         st.error(f"Could not read saved reports: {exc}")
+
+with proposal_tab:
+    st.subheader("Proposal")
+    st.caption(
+        "One proposal per ticker, using the latest analysis date; for the same date, "
+        "the last generated report wins. Overweight = Buy; Underweight = Sell. "
+        "Experimental research, not financial advice."
+    )
+    st.button("Refresh proposals")
+    try:
+        proposals, proposal_warnings = latest_proposals(results_dir)
+        for row in proposals:
+            if not row["Name"]:
+                row["Name"] = proposal_name(row["Ticker"])
+                if not row["Name"]:
+                    row["Name"] = "Not available"
+                    proposal_warnings.append(
+                        f"{row['Ticker']}: company name could not be resolved."
+                    )
+        if proposals:
+            st.dataframe(
+                proposals,
+                column_order=["Ticker", "Name", "Date", "Proposal"],
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            st.info("No readable proposals in saved reports yet.")
+        for warning in proposal_warnings:
+            st.warning(warning)
+    except OSError as exc:
+        logger.exception("Could not read proposals")
+        st.error(f"Could not read proposals: {exc}")

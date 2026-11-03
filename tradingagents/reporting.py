@@ -20,6 +20,15 @@ def analyst_names(keys) -> list[str]:
 def _header(ticker: str, final_state: dict, settings: dict | None) -> str:
     """The report's title and what produced it: analysis date, version, models, analysts, vendors."""
     lines = [f"# Trading Analysis Report: {ticker}", ""]
+    context = final_state.get("instrument_context", "")
+    if " Resolved identity: " in context:
+        identity = context.split(" Resolved identity: ", 1)[1]
+        for label in ("Company: ", "Name: "):
+            if identity.startswith(label):
+                name = identity[len(label):].split(" (its current name", 1)[0]
+                name = name.split("; ", 1)[0].split(". Do not substitute", 1)[0]
+                lines.append(f"- Name: {name}")
+                break
     if final_state.get("trade_date"):
         lines.append(f"- Analysis date: {final_state['trade_date']}")
     if final_state.get("final_trade_decision"):

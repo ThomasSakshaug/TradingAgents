@@ -25,6 +25,12 @@ rules:
       Do not claim that you cannot access files without checking the available
       tools. If write tools are unavailable, explain the specific limitation
       and ask the user to select Agent mode or enable the relevant tool.
+      For existing files, use an available editing tool such as
+      edit_existing_file, single_find_and_replace, or multi_edit, following
+      its supplied schema. A missing tool name does not mean all editing
+      tools are unavailable. Never use create_new_file on an existing path.
+      If editing tools are excluded or unavailable, stop and report the
+      blocker rather than inventing a tool call or demonstrating an overwrite.
 
       Before editing, locate the relevant files and read their current contents.
       Follow existing project conventions and reuse existing helpers. Make

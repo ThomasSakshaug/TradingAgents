@@ -8,13 +8,34 @@ It does not modify the global Continue configuration.
 ## Use
 
 1. Open this repository as a folder in VS Code with Continue enabled.
-2. Select **Coder** in Continue's agent/config selector. If it is not listed,
-   run **Developer: Reload Window**.
-3. Select **Agent** mode, not Chat (no tools) or Plan (read-only tools).
-4. Check Continue's tool permissions: allow file reads/search, file creation and
+2. Click **Main Config** above the chat input to open the config/profile
+   selector. This is separate from the Chat/Plan/Agent mode menu and the
+   model selector (for example, **Codestral Latest**).
+3. Select **coder.yaml**. Continue 2.0.0 initially lists workspace profiles
+   by filename; after loading, this profile is displayed as **Coder**.
+   If neither name is listed, run **Developer: Reload Window** and open the
+   **Main Config** selector again. The repository root containing `.continue`
+   must be an opened workspace folder, not merely a nested folder.
+4. Select **Agent** mode, not Chat (no tools) or Plan (read-only tools).
+5. Check Continue's tool permissions: allow file reads/search, file creation and
    editing, and terminal commands as needed. Keep approval enabled for edits
    and commands; the YAML does not override permissions.
-5. Submit the task and approve the required tool calls.
+6. Start a new conversation, submit the task, and approve the required tool calls.
+
+### Enable editing tools in Continue 2.0.0
+
+Open Continue's configuration page (not VS Code's general settings), then
+select **Tools** in its navigation. Expand **Built-in Tools** and ensure the
+group is enabled. For Codestral, set **Edit File** (`edit_existing_file`) and
+**Find and Replace** (`single_find_and_replace`) to **Ask First**, not
+**Excluded**. Keep **Agent** mode selected; Chat and Plan disable write tools.
+
+These policies are saved in Continue's UI state, not in this agent YAML.
+Changing model roles or agent instructions does not override an excluded tool.
+After changing permissions, start a new conversation so previous claims about
+unavailable tools are not carried forward. If an enabled tool is still reported
+as missing, inspect the actual tool call/error rather than trusting the model's
+prose. Do not use **Create New File** to overwrite an existing file.
 
 For example, ask Coder to create a temporary JSON array in the workspace,
 append one object, and parse the saved file to verify that the original entries
